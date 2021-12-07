@@ -11,6 +11,7 @@ enum class SortType {
   SSort,
   QSort,
   PQSort,
+  TBBSort,
 };
 
 template <class It>
@@ -51,6 +52,8 @@ void sort(It first, It last) {
           [first, last = m1] { sort<SortType::PQSort>(first, last); },
           [first = m2, last] { sort<SortType::PQSort>(first, last); });
     }
+  } else if constexpr (type == SortType::TBBSort) {
+    tbb::parallel_sort(first, last);
   }
 }
 
@@ -74,6 +77,7 @@ int main(int argc, char* argv[]) {
     std::vector<uint64_t> vec0{vec};
     std::vector<uint64_t> vec1{vec};
     std::vector<uint64_t> vec2{vec};
+    std::vector<uint64_t> vec3{vec};
 
     {
       auto tpBegin = std::chrono::high_resolution_clock::now();
@@ -111,7 +115,19 @@ int main(int argc, char* argv[]) {
               .count();
     }
 
-    if (vec0 != vec1 || vec1 != vec2) {
+    {
+      auto tpBegin = std::chrono::high_resolution_clock::now();
+
+      sort<SortType::TBBSort>(vec3.begin(), vec3.end());
+
+      auto tpEnd = std::chrono::high_resolution_clock::now();
+
+      tm[SortType::TBBSort][time] =
+          std::chrono::duration_cast<std::chrono::milliseconds>(tpEnd - tpBegin)
+              .count();
+    }
+
+    if (vec0 != vec1 || vec1 != vec2 || vec2 != vec3) {
       std::abort();
     }
   }
@@ -119,6 +135,7 @@ int main(int argc, char* argv[]) {
   auto& tmSS = tm[SortType::SSort];
   auto& tmCQ = tm[SortType::QSort];
   auto& tmCPQ = tm[SortType::PQSort];
+  auto& tmTBB = tm[SortType::TBBSort];
 
   std::cout << "SSort:\t| ";
   for (auto t : tmSS) {
@@ -142,6 +159,14 @@ int main(int argc, char* argv[]) {
   }
   std::cout << "Avg: "
             << std::accumulate(tmCPQ.begin(), tmCPQ.end(), 0) / tmCPQ.size()
+            << "ms\n";
+
+  std::cout << "TBBSort:\t| ";
+  for (auto t : tmTBB) {
+    std::cout << t << "ms | ";
+  }
+  std::cout << "Avg: "
+            << std::accumulate(tmTBB.begin(), tmTBB.end(), 0) / tmTBB.size()
             << "ms\n";
 
   return 0;
